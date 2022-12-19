@@ -6,13 +6,19 @@
 
 template <typename K, typename V> class Obj {
 public:
-    // const K key;
-    K key;
+    const K key;
+    // K key;
     V val;
     Obj * next;
     Obj * nextWithKey;
     Obj * prev;
 
+    Obj(K k):
+        key(k),
+        val(),
+        next(nullptr),
+        nextWithKey(nullptr),
+        prev(nullptr){}
     
 };
 
@@ -99,9 +105,9 @@ public:
     }
 
     void push(K const &k, V const &v) {
-        Obj<K, V> * helper = new Obj<K, V>();
+        Obj<K, V> * helper = new Obj<K, V>(k);
         helper->val = v;
-        helper->key = k;
+        // helper->key = k;
         helper->next = nullptr;
         helper->nextWithKey = nullptr;
         if (empty()) {
