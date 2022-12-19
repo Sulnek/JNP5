@@ -7,43 +7,22 @@
 template <typename K, typename V> class Obj {
 public:
     const K key;
-    // K key;
     V val;
     Obj * next;
     Obj * nextWithKey;
     Obj * prev;
 
-    Obj(K k):
+    explicit Obj(K k):
         key(k),
         val(),
         next(nullptr),
         nextWithKey(nullptr),
         prev(nullptr){}
-    
+
 };
 
 template <typename K, typename V> class kvfifo{
 
-// void clear();
-// size_t count(K const &) const;
-// bool empty() const;
-// size_t size() const;
-// std::pair<K const &, V &> first(K const &key);
-// std::pair<K const &, V const &> first(K const &key) const;
-// std::pair<K const &, V &> last(K const &key);
-// std::pair<K const &, V const &> last(K const &key) const;
-// std::pair<K const &, V &> front();
-// std::pair<K const &, V const &> front() const;
-// std::pair<K const &, V &> back();
-// std::pair<K const &, V const &> back() const;
-// void move_to_back(K const &k);
-// void pop(K const &);
-// void pop();
-// void push(K const &k, V const &v);
-// kvfifo();
-// kvfifo(kvfifo const &);
-// kvfifo(kvfifo &&);
-// kvfifo& operator=(kvfifo other);
 private:
     Obj<K, V> * firstMainQueue;
     Obj<K, V> * lastMainQueue;
@@ -91,23 +70,25 @@ public:
             pop();
         }
     }
-    size_t count(K const & k) const {
+    size_t count(K const & k) const noexcept {
         auto ret = sizeWithKey.find(k);
-        return ret;
+        if (ret == sizeWithKey.end()) {
+            return 0;
+        }
+        return ret->second;
     }
 
-    bool empty() const {
+    bool empty() const noexcept {
         return sizeOfMain == 0;
     }
 
-    size_t size() const {
+    size_t size() const noexcept {
         return sizeOfMain;
     }
 
     void push(K const &k, V const &v) {
         Obj<K, V> * helper = new Obj<K, V>(k);
         helper->val = v;
-        // helper->key = k;
         helper->next = nullptr;
         helper->nextWithKey = nullptr;
         if (empty()) {
@@ -117,7 +98,7 @@ public:
         } else {
             lastMainQueue->next = helper;
             helper->prev = lastMainQueue;
-            lastMainQueue = helper; //?
+            lastMainQueue = helper;
 
         }
         sizeOfMain++;
@@ -131,7 +112,6 @@ public:
             (it->second)->nextWithKey = helper;
             auto sizeIt = sizeWithKey.find(k);
             sizeIt->second++;
-            // lastWithKey.insert({k, helper}); //?
             (it->second) = helper;
         }
     }
@@ -151,7 +131,7 @@ public:
         Obj<K, V> * toDelete = it->second;
         removeFromMain(toDelete);
         it->second = toDelete->nextWithKey;
-        //TODO: free(toDelete) - but idk if valgrind will be angry
+        delete toDelete;
         sizeOfMain--;
         auto itSize = sizeWithKey.find(k);
         //there was k in firstWithKey, so k is in here too
@@ -180,13 +160,13 @@ public:
         }
     }
 
-    std::pair<K const &, V &> front(){
+    std::pair<K const &, V &> front() {
         if (empty()) {
             throw std::invalid_argument("Queue was empty!");
         }
         return std::pair<K const &, V &>(
-                (firstMainQueue->key),
-                (firstMainQueue->val)
+                firstMainQueue->key,
+                firstMainQueue->val
                 );
     }
 
