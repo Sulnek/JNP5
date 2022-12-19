@@ -52,9 +52,17 @@ private:
         if (toDelete->next != nullptr) {
             (toDelete->next)->prev = toDelete->prev;
         }
+        else{
+            lastMainQueue = toDelete->prev;
+        }
         if (toDelete->prev != nullptr) {
             (toDelete->prev)->next = toDelete->next;
         }
+        else{
+            firstMainQueue = toDelete->next;
+
+        }
+
     }
 
 public:
@@ -137,16 +145,6 @@ public:
         Obj<K, V> * toDelete = it->second;
         removeFromMain(toDelete);
         it->second = toDelete->nextWithKey;
-
-        //i was first
-        if(toDelete->prev == nullptr){
-            firstMainQueue = toDelete->next;
-        }
-        //i was last
-        if(toDelete->next == nullptr){
-            lastMainQueue = toDelete->prev;
-        }
-
         //TODO: free(toDelete) - but idk if valgrind will be angry
         sizeOfMain--;
         auto itSize = sizeWithKey.find(k);
@@ -231,7 +229,7 @@ public:
                 (firstWithKey.find(key)->second->val)
         );
       }
-      
+
       std::pair<K const &, V &> last(K const &key){
         if(empty()){
             throw std::invalid_argument("Queue was empty!");
