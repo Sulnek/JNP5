@@ -22,17 +22,32 @@ public:
 
 };
 
-
-template <typename K, typename V> class kvfifo{
-
-private:
-    Obj<K, V> * firstMainQueue;
-    Obj<K, V> * lastMainQueue;
+template <typename K, typename V> class Wrapper {
+public:
+    Obj<K, V> *firstMainQueue;
+    Obj<K, V> *lastMainQueue;
     std::map<K, Obj<K, V> *> firstWithKey;
     std::map<K, Obj<K, V> *> lastWithKey;
     std::map<K, size_t> sizeWithKey;
     size_t sizeOfMain;
+    size_t amountOfCopies;
 
+    Wrapper():
+            firstMainQueue(nullptr),
+            lastMainQueue(nullptr),
+            firstWithKey(),
+            lastWithKey(),
+            sizeWithKey(),
+            sizeOfMain(0),
+            amountOfCopies(1){}
+};
+
+
+template <typename K, typename V> class kvfifo{
+
+public:
+    Wrapper<K, V> *Wrap;
+    
     //just helpful function that patches the list while removing
     //from it
     void removeFromMain(Obj<K ,V> * toDelete) {
@@ -40,32 +55,66 @@ private:
             (toDelete->next)->prev = toDelete->prev;
         }
         else{
-            lastMainQueue = toDelete->prev;
+            Wrap->lastMainQueue = toDelete->prev;
         }
         if (toDelete->prev != nullptr) {
             (toDelete->prev)->next = toDelete->next;
         }
         else{
-            firstMainQueue = toDelete->next;
+            Wrap->firstMainQueue = toDelete->next;
 
         }
+    }
+
+    void checkCopy(){
+        if(Wrap->amountOfCopies > 1){
+            Wrapper<K, V> *wrapCopy = new Wrapper<K, V>();//nasz
+            wrapCopy->amountOfCopies = 1;
+            if(Wrap->sizeOfMain > 0){
+                auto x = Wrap->firstMainQueue;
+                size_t i = 0;
+                while(i < Wrap->sizeOfMain){
+                    const K fi = x->key;
+                    const V sn = x->val;
+                    pushWrap(fi, sn, wrapCopy);
+                    x = x->next;
+                    i++;
+                }
+            }
+            Wrap->amountOfCopies--;
+            Wrap = wrapCopy;
+        }
+
 
     }
 
+
+
+
 public:
     kvfifo():
-            firstMainQueue(nullptr),
-            lastMainQueue(nullptr),
-            firstWithKey(),
-            lastWithKey(),
-            sizeWithKey(),
-            sizeOfMain(0){}
+        Wrap(new Wrapper<K, V>()){}
 
-    //kvfifo(kvfifo const &);
+    kvfifo(kvfifo const &other){
+        Wrap = other.Wrap;
+        Wrap->amountOfCopies++;
+    }
 
-    //kvfifo(kvfifo &&);
+    //to robi, ze other jest pusty teraz?
+    kvfifo(kvfifo &&other){
+        //chyba trzeba clear ten poprzedni
+        if(&other != this){
+            Wrap = other.Wrap;
+            other.Wrap = nullptr;
+        }
+    }
 
-    //kvfifo & operator= (kvfifo other);
+    kvfifo & operator= (kvfifo other){
+        //chyba trzeba clear ten poprzedni
+        this->Wrap = other.Wrap;
+        Wrap->amountOfCopies++;
+        return *this;
+    }
 
     void clear() {
         while(!empty()) {
@@ -73,90 +122,126 @@ public:
         }
     }
     size_t count(K const & k) const noexcept {
-        auto ret = sizeWithKey.find(k);
-        if (ret == sizeWithKey.end()) {
+        auto ret = Wrap->sizeWithKey.find(k);
+        if (ret == Wrap->sizeWithKey.end()) {
             return 0;
         }
         return ret->second;
     }
 
     bool empty() const noexcept {
-        return sizeOfMain == 0;
+        return Wrap->sizeOfMain == 0;
     }
 
     size_t size() const noexcept {
-        return sizeOfMain;
+        return Wrap->sizeOfMain;
     }
 
     void push(K const &k, V const &v) {
+        checkCopy();
         Obj<K, V> * helper = new Obj<K, V>(k);
         helper->val = v;
         helper->next = nullptr;
         helper->nextWithKey = nullptr;
         if (empty()) {
-            firstMainQueue = helper;
-            lastMainQueue = helper;
+            Wrap->firstMainQueue = helper;
+            Wrap->lastMainQueue = helper;
             helper->prev = nullptr;
         } else {
-            lastMainQueue->next = helper;
-            helper->prev = lastMainQueue;
-            lastMainQueue = helper;
+            Wrap->lastMainQueue->next = helper;
+            helper->prev = Wrap->lastMainQueue;
+            Wrap->lastMainQueue = helper;
 
         }
-        sizeOfMain++;
+        Wrap->sizeOfMain++;
 
-        auto it = lastWithKey.find(k);
-        if (it == lastWithKey.end()) { //first of such key
-            firstWithKey.insert({k, helper});
-            sizeWithKey.insert({k, 1});
-            lastWithKey.insert({k, helper});
+        auto it = Wrap->lastWithKey.find(k);
+        if (it == Wrap->lastWithKey.end()) { //first of such key
+            Wrap->firstWithKey.insert({k, helper});
+            Wrap->sizeWithKey.insert({k, 1});
+            Wrap->lastWithKey.insert({k, helper});
         } else {
             (it->second)->nextWithKey = helper;
-            auto sizeIt = sizeWithKey.find(k);
+            auto sizeIt = Wrap->sizeWithKey.find(k);
+            sizeIt->second++;
+            (it->second) = helper;
+        }
+    }
+    //to COPY
+    void pushWrap(K const &k, V const &v, Wrapper<K,V> *wrapp) {
+        Obj<K, V> * helper = new Obj<K, V>(k);
+        helper->val = v;
+        helper->next = nullptr;
+        helper->nextWithKey = nullptr;
+
+        if (wrapp->sizeOfMain == 0) {
+            wrapp->firstMainQueue = helper;
+            wrapp->lastMainQueue = helper;
+            helper->prev = nullptr;
+        } else {
+            wrapp->lastMainQueue->next = helper;
+            helper->prev = wrapp->lastMainQueue;
+            wrapp->lastMainQueue = helper;
+
+        }
+        wrapp->sizeOfMain++;
+
+
+        auto it = wrapp->lastWithKey.find(k);
+        if (it == wrapp->lastWithKey.end()) { //first of such key
+            wrapp->firstWithKey.insert({k, helper});
+            wrapp->sizeWithKey.insert({k, 1});
+            wrapp->lastWithKey.insert({k, helper});
+        } else {
+            (it->second)->nextWithKey = helper;
+            auto sizeIt = wrapp->sizeWithKey.find(k);
             sizeIt->second++;
             (it->second) = helper;
         }
     }
 
     void pop() {
-        if (firstMainQueue == nullptr) {
+        if (Wrap->firstMainQueue == nullptr) {
             throw std::invalid_argument("Queue was empty, yet pop was called");
         }
-        pop(firstMainQueue->key);
+        pop(Wrap->firstMainQueue->key);
     }
 
     void pop(K k) {
-        auto it = firstWithKey.find(k);
-        if (it == firstWithKey.end()) {
+        auto it = Wrap->firstWithKey.find(k);
+        if (it == Wrap->firstWithKey.end()) {
             throw std::invalid_argument("Queue did not have such a key!");
         }
+        //
+        checkCopy();
         Obj<K, V> * toDelete = it->second;
         removeFromMain(toDelete);
         it->second = toDelete->nextWithKey;
         delete toDelete;
-        sizeOfMain--;
-        auto itSize = sizeWithKey.find(k);
-        //there was k in firstWithKey, so k is in here too
+        Wrap->sizeOfMain--;
+        auto itSize = Wrap->sizeWithKey.find(k);
+        //there was k in Wrap->firstWithKey, so k is in here too
         itSize->second--;
         if (itSize->second == 0) {
-            sizeWithKey.erase(itSize);
-            firstWithKey.erase(it);
-            lastWithKey.erase(k);
+            Wrap->sizeWithKey.erase(itSize);
+            Wrap->firstWithKey.erase(it);
+            Wrap->lastWithKey.erase(k);
         }
     }
 
     void move_to_back(K const &k) {
-        auto itFirst = firstWithKey.find(k);
-        if (itFirst == firstWithKey.end()) {
+        auto itFirst = Wrap->firstWithKey.find(k);
+        if (itFirst == Wrap->firstWithKey.end()) {
             throw std::invalid_argument("Queue did not have elements of such key!");
         }
+        checkCopy();
         Obj<K, V> * helper = itFirst->second;
         while (helper != nullptr) {
             removeFromMain(helper);
-            lastMainQueue->next = helper;
-            helper->prev = lastMainQueue;
+            Wrap->lastMainQueue->next = helper;
+            helper->prev = Wrap->lastMainQueue;
             helper->next = nullptr;
-            lastMainQueue = helper;
+            Wrap->lastMainQueue = helper;
 
             helper = helper->nextWithKey;
         }
@@ -166,12 +251,15 @@ public:
         if (empty()) {
             throw std::invalid_argument("Queue was empty!");
         }
+        // mozna edytowac, czyli copy?
+        checkCopy();
         return std::pair<K const &, V &>(
-                firstMainQueue->key,
-                firstMainQueue->val
+                Wrap->firstMainQueue->key,
+                Wrap->firstMainQueue->val
                 );
     }
 
+    // tu pewnie bez tego copy
     //to wogole potrzebne?
     // //TODO: Verify next two WARNINGs and maybe fix them
     // //WARNING: seems sth is wrong but compiles??
@@ -180,8 +268,8 @@ public:
     //         throw std::invalid_argument("Queue was empty!");
     //     }
     //     return new std::pair<K const &, V const &>(
-    //             &(firstMainQueue->key),
-    //             &(firstMainQueue->val)
+    //             &(Wrap->firstMainQueue->key),
+    //             &(Wrap->firstMainQueue->val)
     //     );
     // }
 
@@ -189,9 +277,11 @@ public:
         if (empty()) {
             throw std::invalid_argument("Queue was empty!");
         }
+        //mozna edytroac wiec copy
+        checkCopy();
         return std::pair<K const &, V &>(
-                (lastMainQueue->key),
-                (lastMainQueue->val)
+                (Wrap->lastMainQueue->key),
+                (Wrap->lastMainQueue->val)
                 );
     }
     // //WARNING: same as above
@@ -200,8 +290,8 @@ public:
     //         throw std::invalid_argument("Queue was empty!");
     //     }
     //     return new std::pair<K const &, V const &>(
-    //             &(lastMainQueue->key),
-    //             &(lastMainQueue->val)
+    //             &(Wrap->lastMainQueue->key),
+    //             &(Wrap->lastMainQueue->val)
     //     );
     // }
 
@@ -209,24 +299,28 @@ public:
       std::pair<K const &, V &> first(K const &key){
         if(empty()){
             throw std::invalid_argument("Queue was empty!");
-        } else if(firstWithKey.find(key) == firstWithKey.end()){
+        } else if(Wrap->firstWithKey.find(key) == Wrap->firstWithKey.end()){
             throw std::invalid_argument("Queue does not have a key!");
         }
+        // mozna edytowac wiec copy
+        checkCopy();
         return std::pair<K const &, V &>(
-                (firstWithKey.find(key)->second->key),
-                (firstWithKey.find(key)->second->val)
+                (Wrap->firstWithKey.find(key)->second->key),
+                (Wrap->firstWithKey.find(key)->second->val)
         );
       }
 
       std::pair<K const &, V &> last(K const &key){
         if(empty()){
             throw std::invalid_argument("Queue was empty!");
-        } else if(lastWithKey.find(key) == lastWithKey.end()){
+        } else if(Wrap->lastWithKey.find(key) == Wrap->lastWithKey.end()){
             throw std::invalid_argument("Queue does not have a key!");
         }
+        //mozna edytowac wiec copy
+        checkCopy();
         return std::pair<K const &, V &>(
-                (lastWithKey.find(key)->second->key),
-                (lastWithKey.find(key)->second->val)
+                (Wrap->lastWithKey.find(key)->second->key),
+                (Wrap->lastWithKey.find(key)->second->val)
         );
       }
 
@@ -249,8 +343,8 @@ public:
         
     };
 
-    Iterator k_begin() { return Iterator(firstWithKey.begin()); }
-    Iterator k_end()   { return Iterator(firstWithKey.end()); }
+    Iterator k_begin() { return Iterator(Wrap->firstWithKey.begin()); }
+    Iterator k_end()   { return Iterator(Wrap->firstWithKey.end()); }
 
     //W niektórych miejscach (np w push()) alokujemy nową pamięć, co wtedy z exceptionsami?
     //TODO: sprawdzic gdzie mozna dac const lub noexcept
