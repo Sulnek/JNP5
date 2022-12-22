@@ -42,6 +42,24 @@ public:
             amountOfCopies(1){}
 };
 
+template <typename K, typename V>
+struct Iterator 
+    {
+        Iterator(std::map<K, Obj<K, V> *>::iterator ptr) : m_ptr(ptr) {}
+        
+        auto operator*() const { return m_ptr->first; }
+        Iterator& operator++() { m_ptr++; return *this; }  
+        Iterator operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
+        Iterator& operator--() { m_ptr--; return *this; }
+        Iterator operator--(int) { Iterator tmp = *this; --(*this); return tmp; }
+        friend bool operator== (const Iterator& a, const Iterator& b) { return a.m_ptr == b.m_ptr; };
+        friend bool operator!= (const Iterator& a, const Iterator& b) { return a.m_ptr != b.m_ptr; };  
+
+        private:
+            std::map<K, Obj<K, V> *>::iterator m_ptr;
+        
+    };
+
 
 template <typename K, typename V> class kvfifo{
 
@@ -326,25 +344,25 @@ public:
 
     //TODO: Iterator po zbiorze kluczy (któraś mapa .keyValues() zwraca wszystkie klucze chyba)
 
-    struct Iterator 
-    {
-        Iterator(auto ptr) : m_ptr(ptr) {}
+    // struct Iterator 
+    // {
+    //     Iterator(std::map<K, Obj<K, V> *>::iterator ptr) : m_ptr(ptr) {}
         
-        auto operator*() const { return m_ptr->first; }
-        Iterator& operator++() { m_ptr++; return *this; }  
-        Iterator operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
-        Iterator& operator--() { m_ptr--; return *this; }
-        Iterator operator--(int) { Iterator tmp = *this; --(*this); return tmp; }
-        friend bool operator== (const Iterator& a, const Iterator& b) { return a.m_ptr == b.m_ptr; };
-        friend bool operator!= (const Iterator& a, const Iterator& b) { return a.m_ptr != b.m_ptr; };  
+    //     auto operator*() const { return m_ptr->first; }
+    //     Iterator& operator++() { m_ptr++; return *this; }  
+    //     Iterator operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
+    //     Iterator& operator--() { m_ptr--; return *this; }
+    //     Iterator operator--(int) { Iterator tmp = *this; --(*this); return tmp; }
+    //     friend bool operator== (const Iterator& a, const Iterator& b) { return a.m_ptr == b.m_ptr; };
+    //     friend bool operator!= (const Iterator& a, const Iterator& b) { return a.m_ptr != b.m_ptr; };  
 
-        private:
-            std::map<K, Obj<K, V> *>::iterator m_ptr;
+    //     private:
+    //         std::map<K, Obj<K, V> *>::iterator m_ptr;
         
-    };
+    // };
 
-    Iterator k_begin() { return Iterator(Wrap->firstWithKey.begin()); }
-    Iterator k_end()   { return Iterator(Wrap->firstWithKey.end()); }
+    Iterator<K, V> k_begin() { return Iterator<K, V>(Wrap->firstWithKey.begin()); }
+    Iterator<K, V> k_end()   { return Iterator<K, V>(Wrap->firstWithKey.end()); }
 
     //W niektórych miejscach (np w push()) alokujemy nową pamięć, co wtedy z exceptionsami?
     //TODO: sprawdzic gdzie mozna dac const lub noexcept
