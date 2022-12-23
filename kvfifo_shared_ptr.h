@@ -130,16 +130,22 @@ private:
 
     std::shared_ptr< Wrapper<K, V> > createCopy() {
         std::shared_ptr< Wrapper<K, V> > wrapCopy = std::make_shared< Wrapper<K, V> >();
-        if (Wrap.get()->sizeOfMain > 0) {
-            auto x = Wrap.get()->firstMainQueue.get();
-            size_t i = 0;
-            while (i < Wrap.get()->sizeOfMain) {
-                K fi = x->key;
-                V sn = x->val;
-                wrapCopy->pushWrap(fi, sn);
-                x = (x->next).get();
-                i++;
+        try {
+            if (Wrap.get()->sizeOfMain > 0) {
+                auto x = Wrap.get()->firstMainQueue.get();
+                size_t i = 0;
+                while (i < Wrap.get()->sizeOfMain) {
+                    K fi = x->key;
+                    V sn = x->val;
+                    wrapCopy->pushWrap(fi, sn);
+                    x = (x->next).get();
+                    i++;
+                }
             }
+        }
+        catch (...) {
+            wrapCopy.reset();
+            throw;
         }
         //Wrap.get()->amountOfCopies--;
         return wrapCopy;
@@ -147,7 +153,7 @@ private:
 
     void checkCopy() {
         if (Wrap.use_count() > 1) {
-            std::shared_ptr< Wrapper<K, V> >wrapCopy  = createCopy();
+            std::shared_ptr< Wrapper<K, V> > wrapCopy  = createCopy();
             Wrap = wrapCopy;
         }
     }
@@ -191,8 +197,13 @@ public:
     }
 
     void clear() {
-        while (!empty()) {
-            pop();
+        if (Wrap.use_count() > 1) {
+            Wrap = std::make_shared<Wrapper <K, V>>();
+        }
+        else {
+            while (!empty()) {
+                pop();
+            }
         }
     }
     
@@ -213,9 +224,16 @@ public:
     }
 
     void push(K const &k, V const &v) {
-        checkCopy();
-        Wrap.get()->refExist = false;
-        Wrap.get()->pushWrap(k, v);
+        auto originalWrap = Wrap;
+        try {
+            checkCopy();
+            Wrap.get()->refExist = false;
+            Wrap.get()->pushWrap(k, v);
+        }
+        catch (...) {
+            Wrap = originalWrap;
+            throw;
+        }
     }
 
     void pop() {
