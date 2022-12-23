@@ -20,7 +20,7 @@ public:
         val(),
         next(nullptr),
         nextWithKey(nullptr),
-        prev(nullptr){}
+        prev(nullptr) {}
 
 };
 
@@ -32,18 +32,30 @@ public:
     std::map<K, std::shared_ptr< Obj<K, V> > > lastWithKey;
     std::map<K, size_t> sizeWithKey;
     size_t sizeOfMain;
-    size_t amountOfCopies;
+    //size_t amountOfCopies;
     bool refExist;
 
     Wrapper():
-            firstMainQueue(nullptr),
-            lastMainQueue(nullptr),
-            firstWithKey(),
-            lastWithKey(),
-            sizeWithKey(),
-            sizeOfMain(0),
-            amountOfCopies(1),
-            refExist(false){}
+        firstMainQueue(nullptr),
+        lastMainQueue(nullptr),
+        firstWithKey(),
+        lastWithKey(),
+        sizeWithKey(),
+        sizeOfMain(0),
+        //amountOfCopies(1),
+        refExist(false) {}
+
+    ~Wrapper() {
+        std::shared_ptr< Obj<K, V> > * ptr = firstMainQueue;
+        while (ptr != nullptr) {
+            std::shared_ptr< Obj<K, V> > nextPtr = ptr->get()->next;
+            ptr->get()->nextWithKey = nullptr;
+            ptr->get()->next = nullptr;
+            ptr->get()->prev = nullptr;
+            ptr = nextPtr;
+        }
+    }
+
 
     void pushWrap(K const &k, V const &v) {
         std::shared_ptr< Obj<K, V> > sP = std::make_shared< Obj<K, V> >(k);
@@ -79,26 +91,24 @@ public:
 };
 
 template <typename K, typename V>
-struct Iterator 
-    {
-        Iterator(typename std::map<K, std::shared_ptr< Obj<K, V> >>::iterator ptr) : m_ptr(ptr) {}
-        
-        auto operator*() const { return m_ptr->first; }
-        auto operator->() { return &(m_ptr->first); }
-        Iterator& operator++() { m_ptr++; return *this; }
-        Iterator operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
-        Iterator& operator--() { m_ptr--; return *this; }
-        Iterator operator--(int) { Iterator tmp = *this; --(*this); return tmp; }
-        friend bool operator== (const Iterator& a, const Iterator& b) { return a.m_ptr == b.m_ptr; };
-        friend bool operator!= (const Iterator& a, const Iterator& b) { return a.m_ptr != b.m_ptr; };  
+class Iterator {
+private:
+    typename std::map<K, std::shared_ptr< Obj<K, V> > >::iterator m_ptr;
+public:
+    Iterator(typename std::map<K, std::shared_ptr< Obj<K, V> >>::iterator ptr) : m_ptr(ptr) {}
 
-        private:
-            typename std::map<K, std::shared_ptr< Obj<K, V> > >::iterator m_ptr;
-        
-    };
+    auto operator*() const { return m_ptr->first; }
+    auto operator->() { return &(m_ptr->first); }
+    Iterator& operator++() { m_ptr++; return *this; }
+    Iterator operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
+    Iterator& operator--() { m_ptr--; return *this; }
+    Iterator operator--(int) { Iterator tmp = *this; --(*this); return tmp; }
+    friend bool operator== (const Iterator& a, const Iterator& b) { return a.m_ptr == b.m_ptr; };
+    friend bool operator!= (const Iterator& a, const Iterator& b) { return a.m_ptr != b.m_ptr; };
+};
 
 
-template <typename K, typename V> class kvfifo{
+template <typename K, typename V> class kvfifo {
 
 private:
     std::shared_ptr< Wrapper<K, V> > Wrap;
@@ -115,78 +125,72 @@ private:
         }
         else{
             Wrap.get()->firstMainQueue = toDelete->next;
-
         }
     }
 
-    std::shared_ptr< Wrapper<K, V> > createCopy(){
+    std::shared_ptr< Wrapper<K, V> > createCopy() {
         std::shared_ptr< Wrapper<K, V> > wrapCopy = std::make_shared< Wrapper<K, V> >();
-            wrapCopy->amountOfCopies = 1;
-            if(Wrap.get()->sizeOfMain > 0){
-                auto x = Wrap.get()->firstMainQueue.get();
-                size_t i = 0;
-                while(i < Wrap.get()->sizeOfMain){
-                    K fi = x->key;
-                    V sn = x->val;
-                    wrapCopy->pushWrap(fi, sn);
-                    x = (x->next).get();
-                    i++;
-                }
+        if (Wrap.get()->sizeOfMain > 0) {
+            auto x = Wrap.get()->firstMainQueue.get();
+            size_t i = 0;
+            while (i < Wrap.get()->sizeOfMain) {
+                K fi = x->key;
+                V sn = x->val;
+                wrapCopy->pushWrap(fi, sn);
+                x = (x->next).get();
+                i++;
             }
-            Wrap.get()->amountOfCopies--;
-            return wrapCopy;
+        }
+        //Wrap.get()->amountOfCopies--;
+        return wrapCopy;
     }
 
-    void checkCopy(){
-        if(Wrap.get()->amountOfCopies > 1){
+    void checkCopy() {
+        if (Wrap.use_count() > 1) {
             std::shared_ptr< Wrapper<K, V> >wrapCopy  = createCopy();
             Wrap = wrapCopy;
         }
-
     }
 
-    void checkRef(){
-        if(Wrap.get()->refExist){
+    void checkRef() {
+        if (Wrap.get()->refExist) {
             std::shared_ptr< Wrapper<K, V> > wrapCopy = createCopy();
             Wrap = wrapCopy;
         }
     }
 
-
 public:
-    kvfifo(){
+    kvfifo() {
         Wrap = std::make_shared< Wrapper<K, V> >();
     }
 
-    kvfifo(kvfifo const &other){
+    kvfifo(kvfifo const &other) {
         Wrap = other.Wrap;
-        Wrap.get()->amountOfCopies++;
         checkRef();
     }
 
-    kvfifo(kvfifo &&other){
-        if(&other != this){
+    kvfifo(kvfifo &&other) {
+        if (&other != this) {
             Wrap = other.Wrap;
             //no tutaj to najpierw trzeba wyczyscic stary :P
             other.Wrap = nullptr;
         }
     }
 
-    kvfifo & operator= (kvfifo other){
-        if(Wrap != nullptr){
-            Wrap.get()->amountOfCopies--;
-            if(Wrap.get()->amountOfCopies == 0){
-                clear();
-            }
-        }
-        Wrap = other.Wrap;
-        Wrap.get()->amountOfCopies++;
+    kvfifo & operator= (kvfifo other) {
+        //if (Wrap != nullptr) {
+            //Wrap.get()->amountOfCopies--;
+            //if (Wrap.get()->amountOfCopies == 0) {
+            //    clear();
+            //}
+        //}
+        Wrap = std::make_shared<Wrapper<K ,V>>(other.Wrap);//other.Wrap;
         checkRef();
         return *this;
     }
 
     void clear() {
-        while(!empty()) {
+        while (!empty()) {
             pop();
         }
     }
@@ -256,7 +260,7 @@ public:
         Wrap.get()->refExist = false;
         std::shared_ptr< Obj<K, V> > helper = (itFirst->second);
         int i = count(k);
-        for(int j = 0 ; j < i ; j++){
+        for(int j = 0 ; j < i ; j++) {
             removeFromMain(helper);
             Wrap.get()->lastMainQueue.get()->next = helper;
             helper.get()->prev = (Wrap.get()->lastMainQueue);
@@ -310,10 +314,10 @@ public:
         );
     }
 
-    std::pair<K const &, V &> first(K const &key){
-        if(empty()){
+    std::pair<K const &, V &> first(K const &key) {
+        if (empty()) {
             throw std::invalid_argument("Queue was empty!");
-        } else if(Wrap.get()->firstWithKey.find(key) == Wrap.get()->firstWithKey.end()){
+        } else if (Wrap.get()->firstWithKey.find(key) == Wrap.get()->firstWithKey.end()) {
             throw std::invalid_argument("Queue does not have a key!");
         }
         checkCopy();
@@ -325,9 +329,9 @@ public:
       }
     
     std::pair<K const &, V const &> first(K const &key) const{
-        if(empty()){
+        if (empty()) {
             throw std::invalid_argument("Queue was empty!");
-        } else if(Wrap.get()->firstWithKey.find(key) == Wrap.get()->firstWithKey.end()){
+        } else if (Wrap.get()->firstWithKey.find(key) == Wrap.get()->firstWithKey.end()) {
             throw std::invalid_argument("Queue does not have a key!");
         }
         return std::pair<K const &, V &>(
@@ -336,10 +340,10 @@ public:
         );
       }
 
-    std::pair<K const &, V &> last(K const &key){
-        if(empty()){
+    std::pair<K const &, V &> last(K const &key) {
+        if (empty()) {
             throw std::invalid_argument("Queue was empty!");
-        } else if(Wrap.get()->lastWithKey.find(key) == Wrap.get()->lastWithKey.end()){
+        } else if (Wrap.get()->lastWithKey.find(key) == Wrap.get()->lastWithKey.end()) {
             throw std::invalid_argument("Queue does not have a key!");
         }
         checkCopy();
@@ -351,9 +355,9 @@ public:
       }
 
     std::pair<K const &, V const &> last(K const &key) const {
-        if(empty()){
+        if (empty()) {
             throw std::invalid_argument("Queue was empty!");
-        } else if(Wrap.get()->lastWithKey.find(key) == Wrap.get()->lastWithKey.end()){
+        } else if (Wrap.get()->lastWithKey.find(key) == Wrap.get()->lastWithKey.end()) {
             throw std::invalid_argument("Queue does not have a key!");
         }
         return std::pair<K const &, V &>(
@@ -364,11 +368,6 @@ public:
       
     Iterator<K, V> k_begin() { return Iterator<K, V>(Wrap.get()->firstWithKey.begin()); }
     Iterator<K, V> k_end()   { return Iterator<K, V>(Wrap.get()->firstWithKey.end()); }
-
-    //W niektórych miejscach (np w push()) alokujemy nową pamięć, co wtedy z exceptionsami?
-    //TODO: sprawdzic gdzie mozna dac const lub noexcept
-    //TODO: naprawic alokowanie pamieci - chyba robie to w zbyt javovy sposób
-
 };
 
 #endif //JNP5_KVFIFO_H
