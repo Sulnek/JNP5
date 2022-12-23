@@ -49,9 +49,9 @@ public:
         std::shared_ptr< Obj<K, V> > * ptr = firstMainQueue;
         while (ptr != nullptr) {
             std::shared_ptr< Obj<K, V> > nextPtr = ptr->get()->next;
-            ptr->get()->nextWithKey = nullptr;
-            ptr->get()->next = nullptr;
-            ptr->get()->prev = nullptr;
+            ptr->get()->nextWithKey.reset();
+            //ptr->get()->next.reset();
+            ptr->get()->prev.reset();
             ptr = nextPtr;
         }
     }
