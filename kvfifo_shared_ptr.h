@@ -46,12 +46,12 @@ public:
         refExist(false) {}
 
     ~Wrapper() {
-        std::shared_ptr< Obj<K, V> > * ptr = firstMainQueue;
+        std::shared_ptr< Obj<K, V> > ptr = firstMainQueue;
         while (ptr != nullptr) {
-            std::shared_ptr< Obj<K, V> > nextPtr = ptr->get()->next;
-            ptr->get()->nextWithKey.reset();
-            //ptr->get()->next.reset();
-            ptr->get()->prev.reset();
+            std::shared_ptr< Obj<K, V> > nextPtr = ptr.get()->next;
+            ptr.get()->nextWithKey.reset();
+            ptr.get()->next.reset();
+            ptr.get()->prev.reset();
             ptr = nextPtr;
         }
     }
@@ -184,7 +184,8 @@ public:
             //    clear();
             //}
         //}
-        Wrap = std::make_shared<Wrapper<K ,V>>(other.Wrap);//other.Wrap;
+        // Wrap = std::make_shared<Wrapper<K ,V>>(other.Wrap.get());//other.Wrap;
+        Wrap = other.Wrap;
         checkRef();
         return *this;
     }
